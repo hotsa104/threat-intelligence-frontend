@@ -1,12 +1,10 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import {
   fetchVulnStats,
-  fetchVulnerabilities,
   fetchCriticalEnriched,
   Vulnerability,
 } from "../api";
 import { PRIORITY_COLORS } from "../theme";
-import { useTheme } from "../ThemeContext";
 import { Header } from "./Header";
 import { XThreatsPage } from "./XThreatsPage";
 import { VulnerabilitiesPage } from "./VulnerabilitiesPage";
