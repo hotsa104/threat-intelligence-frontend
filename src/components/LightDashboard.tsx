@@ -8,6 +8,7 @@ import { PRIORITY_COLORS } from "../theme";
 import { Header } from "./Header";
 import { XThreatsPage } from "./XThreatsPage";
 import { VulnerabilitiesPage } from "./VulnerabilitiesPage";
+import { HoneypotPanel } from "./HoneypotPanel";
 
 // === MetricCard with Hover Animation ===
 const MetricCard: React.FC<{
@@ -171,11 +172,23 @@ const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
                     "transparent";
                 }}
               >
-                <td
-                  className="px-4 py-2 font-mono"
-                  style={{ color: "#0ea5e9" }}
-                >
-                  {v.cveID}
+                <td className="px-4 py-2 font-mono">
+                  <a
+                    href={`https://nvd.nist.gov/vuln/detail/${v.cveID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#0ea5e9", textDecoration: "none" }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLAnchorElement).style.textDecoration =
+                        "underline";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLAnchorElement).style.textDecoration =
+                        "none";
+                    }}
+                  >
+                    {v.cveID}
+                  </a>
                 </td>
                 <td
                   className="px-4 py-2"
@@ -377,21 +390,29 @@ export const LightDashboard: React.FC = () => {
                     />
                   </div>
 
-                  {/* Critical Vulnerabilities Section */}
-                  <div
-                    className="rounded-lg border p-6"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                    }}
-                  >
-                    <h3
-                      className="text-lg font-bold mb-4"
-                      style={{ color: "var(--text-primary)" }}
+                  {/* Bottom Section: Critical Vulns + Honeypot */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Critical Vulnerabilities (2/3 width) */}
+                    <div
+                      className="lg:col-span-2 rounded-lg border p-6"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        borderColor: "var(--border-color)",
+                      }}
                     >
-                      Recent Critical Vulnerabilities
-                    </h3>
-                    <VulnTable vulns={criticalVulns} />
+                      <h3
+                        className="text-lg font-bold mb-4"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Recent Critical Vulnerabilities
+                      </h3>
+                      <VulnTable vulns={criticalVulns} />
+                    </div>
+
+                    {/* Honeypot Panel (1/3 width) */}
+                    <div className="lg:col-span-1">
+                      <HoneypotPanel />
+                    </div>
                   </div>
                 </>
               ) : (

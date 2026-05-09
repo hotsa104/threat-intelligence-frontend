@@ -92,6 +92,37 @@ export const fetchVulnStats = () =>
     last_sync?: string;
   }>("/vulnerabilities/stats");
 
+export interface StatsSummary {
+  kev_count: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  tpot_attacks_24h: number;
+  last_sync?: Record<string, any> | null;
+}
+
+export const fetchStatsSummary = () =>
+  api.get<StatsSummary>("/stats/summary");
+
 // === Critical Vulnerabilities ===
 export const fetchCriticalEnriched = () =>
-  api.get<VulnerabilitiesResponse>("/vulnerabilities?priority=CRITICAL&limit=10");
+  api.get<VulnerabilitiesResponse>("/vulnerabilities", {
+    params: { priority: "CRITICAL", limit: 10 },
+  });
+
+// === Honeypot Stats ===
+export interface HoneypotPortEntry {
+  port: number;
+  count: number;
+}
+
+export interface HoneypotStats {
+  available: boolean;
+  total: number;
+  top_ports: HoneypotPortEntry[];
+  message?: string;
+}
+
+export const fetchHoneypotStats = () =>
+  api.get<HoneypotStats>("/honeypot/stats");

@@ -1,14 +1,48 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { fetchVulnerabilities, Vulnerability } from "../api";
 import { PRIORITY_COLORS } from "../theme";
 
 const SEVERITIES = ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
+const PRIORITY_ORDER: Record<string, number> = {
+  CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3,
+};
+
+type SortKey = "cveID" | "vulnerabilityName" | "vendorProject" | "epss_score" | "priority" | "dateAdded";
+type SortOrder = "asc" | "desc";
 
 export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = ({ initialFilter }) => {
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
   const [activeSeverity, setActiveSeverity] = useState(initialFilter || "ALL");
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [sortKey, setSortKey] = useState<SortKey>("priority");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortOrder("asc");
+    }
+  };
+
+  const sorted = useMemo(() => {
+    return [...vulns].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "epss_score") {
+        cmp = (a.epss_score || 0) - (b.epss_score || 0);
+      } else if (sortKey === "priority") {
+        cmp = (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4);
+      } else if (sortKey === "dateAdded") {
+        cmp = new Date(a.dateAdded || 0).getTime() - new Date(b.dateAdded || 0).getTime();
+      } else {
+        cmp = (a[sortKey] || "").localeCompare(b[sortKey] || "");
+      }
+      return sortOrder === "asc" ? cmp : -cmp;
+    });
+  }, [vulns, sortKey, sortOrder]);
 
   // === Fetch vulnerabilities ===
   useEffect(() => {
@@ -133,46 +167,38 @@ export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = 
                 className="border-b"
               >
                 <tr>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    CVE ID
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Title
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Vendor / Product
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    EPSS
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Priority
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Date Added
-                  </th>
+                  {(
+                    [
+                      { key: "cveID", label: "CVE ID" },
+                      { key: "vulnerabilityName", label: "Title" },
+                      { key: "vendorProject", label: "Vendor / Product" },
+                      { key: "epss_score", label: "EPSS" },
+                      { key: "priority", label: "Priority" },
+                      { key: "dateAdded", label: "Date Added" },
+                    ] as { key: SortKey; label: string }[]
+                  ).map(({ key, label }) => (
+                    <th
+                      key={key}
+                      className="px-6 py-3 text-left font-semibold select-none"
+                      style={{ color: "var(--text-primary)", cursor: "pointer", whiteSpace: "nowrap" }}
+                      onClick={() => handleSort(key)}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLTableCellElement).style.color = "var(--input-focus)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLTableCellElement).style.color = "var(--text-primary)";
+                      }}
+                    >
+                      {label}{" "}
+                      <span style={{ opacity: sortKey === key ? 1 : 0.3 }}>
+                        {sortKey === key ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {vulns.map((v) => (
+                {sorted.map((v) => (
                   <tr
                     key={v.cveID}
                     className="transition"
@@ -189,11 +215,23 @@ export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = 
                         "transparent";
                     }}
                   >
-                    <td
-                      className="px-6 py-3 font-mono"
-                      style={{ color: "#0ea5e9" }}
-                    >
-                      {v.cveID}
+                    <td className="px-6 py-3 font-mono">
+                      <a
+                        href={`https://nvd.nist.gov/vuln/detail/${v.cveID}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#0ea5e9", textDecoration: "none" }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.textDecoration =
+                            "underline";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.textDecoration =
+                            "none";
+                        }}
+                      >
+                        {v.cveID}
+                      </a>
                     </td>
                     <td
                       className="px-6 py-3 max-w-xs"
