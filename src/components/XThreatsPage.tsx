@@ -58,7 +58,6 @@ export const XThreatsPage: React.FC = () => {
   };
 
   const handleClearSearch = () => setSearchText("");
-  const handleClearKeyword = () => setActiveKeyword(null);
   const handleClearCve = () => setActiveCve(null);
 
   return (

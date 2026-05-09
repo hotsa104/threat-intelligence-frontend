@@ -1,12 +1,10 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { fetchVulnerabilities, Vulnerability } from "../api";
 import { PRIORITY_COLORS } from "../theme";
-import { useTheme } from "../ThemeContext";
 
 const SEVERITIES = ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"];
 
 export const VulnerabilitiesPage: React.FC = () => {
-  const { theme } = useTheme();
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
   const [activeSeverity, setActiveSeverity] = useState("ALL");
   const [loading, setLoading] = useState(false);

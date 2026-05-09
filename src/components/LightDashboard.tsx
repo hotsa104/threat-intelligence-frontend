@@ -219,7 +219,6 @@ const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
 };
 
 export const LightDashboard: React.FC = () => {
-  const { theme } = useTheme();
   const [page, setPage] = useState<"overview" | "threats" | "vulnerabilities">(
     "overview"
   );
