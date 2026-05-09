@@ -94,4 +94,4 @@ export const fetchVulnStats = () =>
 
 // === Critical Vulnerabilities ===
 export const fetchCriticalEnriched = () =>
-  api.get<VulnerabilitiesResponse>("/vulnerabilities?priority=CRITICAL&limit=10&enrich_nvd=true");
+  api.get<VulnerabilitiesResponse>("/vulnerabilities?priority=CRITICAL&limit=10");
