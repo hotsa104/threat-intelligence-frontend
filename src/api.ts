@@ -2,7 +2,7 @@
  * API クライアント
  */
 
-const API_BASE = ((import.meta.env as any).VITE_API_BASE_URL as string) || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const api = {
   get: <T = any>(path: string, config?: { params?: Record<string, any> }) => {

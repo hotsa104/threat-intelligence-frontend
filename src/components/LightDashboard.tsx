@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   fetchVulnStats,
   fetchCriticalEnriched,
@@ -76,7 +76,7 @@ const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
     if (!debouncedQuery) return vulns;
     const q = debouncedQuery.toLowerCase();
     return vulns.filter(
-      (v) =>
+      (v: Vulnerability) =>
         v.cveID.toLowerCase().includes(q) ||
         v.vulnerabilityName.toLowerCase().includes(q) ||
         v.shortDescription.toLowerCase().includes(q)
