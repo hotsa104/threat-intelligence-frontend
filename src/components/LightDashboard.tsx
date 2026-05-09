@@ -8,6 +8,7 @@ import { PRIORITY_COLORS } from "../theme";
 import { Header } from "./Header";
 import { XThreatsPage } from "./XThreatsPage";
 import { VulnerabilitiesPage } from "./VulnerabilitiesPage";
+import { VulnerabilityDetail } from "./VulnerabilityDetail";
 import { HoneypotPanel } from "./HoneypotPanel";
 
 // === MetricCard with Hover Animation ===
@@ -62,7 +63,7 @@ const MetricCard: React.FC<{
 };
 
 // === VulnTable with Search ===
-const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
+const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string) => void }> = ({ vulns, onSelectCve }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -158,11 +159,12 @@ const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
             {filtered.map((v) => (
               <tr
                 key={v.cveID}
-                className="transition"
+                className="transition cursor-pointer"
                 style={{
                   borderBottomColor: "var(--border-light)",
                   borderBottomWidth: "1px",
                 }}
+                onClick={() => onSelectCve?.(v.cveID)}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
                     "var(--bg-secondary)";
@@ -230,7 +232,7 @@ const VulnTable: React.FC<{ vulns: Vulnerability[] }> = ({ vulns }) => {
 };
 
 export const LightDashboard: React.FC = () => {
-  const [page, setPage] = useState<"overview" | "threats" | "vulnerabilities">(
+  const [page, setPage] = useState<"overview" | "threats" | "vulnerabilities" | "detail">(
     "overview"
   );
   const [stats, setStats] = useState<{
@@ -240,6 +242,7 @@ export const LightDashboard: React.FC = () => {
   const [criticalVulns, setCriticalVulns] = useState<Vulnerability[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
+  const [selectedCveId, setSelectedCveId] = useState<string | null>(null);
 
   // === Fetch on mount & page change ===
   useEffect(() => {
@@ -336,8 +339,22 @@ export const LightDashboard: React.FC = () => {
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {page === "detail" && selectedCveId && (
+            <VulnerabilityDetail
+              cveId={selectedCveId}
+              onBack={() => setPage("vulnerabilities")}
+            />
+          )}
           {page === "threats" && <XThreatsPage />}
-          {page === "vulnerabilities" && <VulnerabilitiesPage initialFilter={filterSeverity} />}
+          {page === "vulnerabilities" && (
+            <VulnerabilitiesPage
+              initialFilter={filterSeverity}
+              onSelectCve={(cveId) => {
+                setSelectedCveId(cveId);
+                setPage("detail");
+              }}
+            />
+          )}}
 
           {page === "overview" && (
             <>
@@ -406,7 +423,13 @@ export const LightDashboard: React.FC = () => {
                       >
                         Recent Critical Vulnerabilities
                       </h3>
-                      <VulnTable vulns={criticalVulns} />
+                      <VulnTable
+                        vulns={criticalVulns}
+                        onSelectCve={(cveId) => {
+                          setSelectedCveId(cveId);
+                          setPage("detail");
+                        }}
+                      />
                     </div>
 
                     {/* Honeypot Panel (1/3 width) */}

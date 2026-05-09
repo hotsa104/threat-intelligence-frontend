@@ -11,7 +11,7 @@ const PRIORITY_ORDER: Record<string, number> = {
 type SortKey = "cveID" | "vulnerabilityName" | "vendorProject" | "epss_score" | "priority" | "dateAdded";
 type SortOrder = "asc" | "desc";
 
-export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = ({ initialFilter }) => {
+export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null; onSelectCve?: (cveId: string) => void }> = ({ initialFilter, onSelectCve }) => {
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
   const [activeSeverity, setActiveSeverity] = useState(initialFilter || "ALL");
   const [loading, setLoading] = useState(false);
@@ -201,11 +201,12 @@ export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = 
                 {sorted.map((v) => (
                   <tr
                     key={v.cveID}
-                    className="transition"
+                    className="transition cursor-pointer"
                     style={{
                       borderBottomColor: "var(--border-light)",
                       borderBottomWidth: "1px",
                     }}
+                    onClick={() => onSelectCve?.(v.cveID)}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
                         "var(--bg-tertiary)";
