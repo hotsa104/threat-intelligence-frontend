@@ -4,9 +4,9 @@ import { PRIORITY_COLORS } from "../theme";
 
 const SEVERITIES = ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"];
 
-export const VulnerabilitiesPage: React.FC = () => {
+export const VulnerabilitiesPage: React.FC<{ initialFilter?: string | null }> = ({ initialFilter }) => {
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
-  const [activeSeverity, setActiveSeverity] = useState("ALL");
+  const [activeSeverity, setActiveSeverity] = useState(initialFilter || "ALL");
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
 

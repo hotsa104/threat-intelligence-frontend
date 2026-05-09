@@ -226,6 +226,7 @@ export const LightDashboard: React.FC = () => {
   } | null>(null);
   const [criticalVulns, setCriticalVulns] = useState<Vulnerability[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
 
   // === Fetch on mount & page change ===
   useEffect(() => {
@@ -323,7 +324,7 @@ export const LightDashboard: React.FC = () => {
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {page === "threats" && <XThreatsPage />}
-          {page === "vulnerabilities" && <VulnerabilitiesPage />}
+          {page === "vulnerabilities" && <VulnerabilitiesPage initialFilter={filterSeverity} />}
 
           {page === "overview" && (
             <>
@@ -341,6 +342,10 @@ export const LightDashboard: React.FC = () => {
                     <MetricCard
                       title="Total Vulnerabilities"
                       value={stats.total}
+                      onClick={() => {
+                        setFilterSeverity(null);
+                        setPage("vulnerabilities");
+                      }}
                     />
                     <MetricCard
                       title="Critical"
@@ -349,14 +354,26 @@ export const LightDashboard: React.FC = () => {
                         ((stats.priority_counts.CRITICAL || 0) / stats.total) *
                         100
                       ).toFixed(1)}%`}
+                      onClick={() => {
+                        setFilterSeverity("CRITICAL");
+                        setPage("vulnerabilities");
+                      }}
                     />
                     <MetricCard
                       title="High"
                       value={stats.priority_counts.HIGH || 0}
+                      onClick={() => {
+                        setFilterSeverity("HIGH");
+                        setPage("vulnerabilities");
+                      }}
                     />
                     <MetricCard
                       title="Medium"
                       value={stats.priority_counts.MEDIUM || 0}
+                      onClick={() => {
+                        setFilterSeverity("MEDIUM");
+                        setPage("vulnerabilities");
+                      }}
                     />
                   </div>
 
