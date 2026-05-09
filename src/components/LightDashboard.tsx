@@ -354,7 +354,7 @@ export const LightDashboard: React.FC = () => {
                 setPage("detail");
               }}
             />
-          )}}
+          )}
 
           {page === "overview" && (
             <>

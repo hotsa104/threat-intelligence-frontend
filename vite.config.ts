@@ -9,7 +9,8 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
-    outDir: "dist",
+    outDir: "../threat-intel-backend/static",
+    emptyOutDir: true,
     sourcemap: false,
   },
 });
