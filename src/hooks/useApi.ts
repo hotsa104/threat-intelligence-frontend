@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, DependencyList } from "react";
+import { useEffect, useState, useCallback } from "react";
+import type { DependencyList } from "react";
 
 interface UseApiState<T> {
   data: T | null;

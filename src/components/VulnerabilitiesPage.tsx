@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { fetchVulnerabilities, Vulnerability } from "../api";
+import { fetchVulnerabilities } from "../api";
+import type { Vulnerability } from "../api";
 import { PRIORITY_COLORS } from "../theme";
 
 const SEVERITIES = ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"];

@@ -90,6 +90,7 @@ export const fetchVulnStats = () =>
   api.get<{
     total: number;
     priority_counts: Record<string, number>;
+    threat_categories?: Record<string, number>;
     last_sync?: string;
   }>("/vulnerabilities/stats");
 

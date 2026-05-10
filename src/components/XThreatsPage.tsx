@@ -1,9 +1,13 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { fetchThreats, Threat } from "../api";
+import { fetchThreats } from "../api";
+import type { Threat } from "../api";
 import { getKeywordColor } from "../theme";
 import { useTheme } from "../ThemeContext";
 
-export const XThreatsPage: React.FC = () => {
+export const XThreatsPage: React.FC<{
+  initialKeyword?: string | null;
+  onKeywordConsumed?: () => void;
+}> = ({ initialKeyword, onKeywordConsumed }) => {
   const { theme } = useTheme();
   const [posts, setPosts] = useState<Threat[]>([]);
   const [loading, setLoading] = useState(false);
@@ -11,6 +15,14 @@ export const XThreatsPage: React.FC = () => {
   const [activeCve, setActiveCve] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // 親からのキーワードフィルタを受け取る
+  useEffect(() => {
+    if (initialKeyword) {
+      setActiveKeyword(initialKeyword);
+      onKeywordConsumed?.();
+    }
+  }, [initialKeyword]);
 
   // === デバウンス (400ms) ===
   useEffect(() => {
@@ -207,18 +219,24 @@ export const XThreatsPage: React.FC = () => {
               key={post.id || idx}
               className="p-4 rounded-lg transition"
               style={{
-                backgroundColor: "var(--bg-secondary)",
+                backgroundColor: "var(--bg-glass)",
                 border: "1px solid var(--border-color)",
-                cursor: "pointer",
+                cursor: post.url ? "pointer" : "default",
+                transition: "all 0.18s ease",
               }}
+              onClick={() => post.url && window.open(post.url, "_blank", "noopener,noreferrer")}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
-                el.style.borderColor = "var(--border-light)";
-                el.style.boxShadow = "0 2px 8px var(--shadow)";
+                el.style.background = "var(--bg-glass-hover)";
+                el.style.borderColor = "rgba(99,102,241,0.4)";
+                el.style.transform = "translateY(-2px)";
+                el.style.boxShadow = "0 8px 24px rgba(0,0,0,0.2)";
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
+                el.style.background = "var(--bg-glass)";
                 el.style.borderColor = "var(--border-color)";
+                el.style.transform = "translateY(0)";
                 el.style.boxShadow = "none";
               }}
             >
@@ -229,7 +247,7 @@ export const XThreatsPage: React.FC = () => {
                   return (
                     <button
                       key={kw}
-                      onClick={() => handleKeywordClick(kw)}
+                      onClick={(e) => { e.stopPropagation(); handleKeywordClick(kw); }}
                       className="px-2 py-1 text-xs font-medium rounded transition"
                       style={{
                         backgroundColor: colors.bg,
@@ -245,7 +263,7 @@ export const XThreatsPage: React.FC = () => {
                 {(post.cves || []).map((cve) => (
                   <button
                     key={cve}
-                    onClick={() => handleCveClick(cve)}
+                    onClick={(e) => { e.stopPropagation(); handleCveClick(cve); }}
                     className="px-2 py-1 text-xs font-medium rounded transition"
                     style={{
                       backgroundColor: "#ea580c",
@@ -253,14 +271,8 @@ export const XThreatsPage: React.FC = () => {
                       border: "1px solid #d97706",
                       cursor: "pointer",
                     }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                        "#d97706";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                        "#ea580c";
-                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#d97706"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#ea580c"; }}
                   >
                     {cve}
                   </button>
@@ -268,40 +280,20 @@ export const XThreatsPage: React.FC = () => {
               </div>
 
               {/* Text Content */}
-              <p
-                className="text-sm mb-3 leading-relaxed"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                 {post.text}
               </p>
 
-              {/* Timestamp & Link */}
-              <div
-                className="flex items-center justify-between text-xs"
-                style={{ color: "var(--text-tertiary)" }}
-              >
-                <span>{post.timestamp || "Unknown date"}</span>
+              {/* Timestamp & X icon */}
+              <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-tertiary)" }}>
+                <span>{post.timestamp ? new Date(post.timestamp).toLocaleString("ja-JP") : "Unknown date"}</span>
                 {post.url && (
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium transition"
-                    style={{
-                      color: "var(--input-focus)",
-                      textDecoration: "none",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.textDecoration =
-                        "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.textDecoration =
-                        "none";
-                    }}
-                  >
-                    View on X →
-                  </a>
+                  <span className="flex items-center gap-1" style={{ color: "var(--accent-primary)" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    View post
+                  </span>
                 )}
               </div>
             </div>
