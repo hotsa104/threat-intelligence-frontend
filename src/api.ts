@@ -2,11 +2,12 @@
  * API クライアント
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const api = {
   get: <T = any>(path: string, config?: { params?: Record<string, any> }) => {
-    const url = new URL(API_BASE + path);
+    const fullPath = API_BASE + path;
+    const url = new URL(fullPath, window.location.origin);
     if (config?.params) {
       Object.entries(config.params).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {

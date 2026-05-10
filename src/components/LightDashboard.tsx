@@ -66,14 +66,47 @@ const MetricCard: React.FC<{
 const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string) => void }> = ({ vulns, onSelectCve }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [references, setReferences] = useState<Record<string, {has_github: boolean, has_article: boolean, has_advisory: boolean, github_url?: string, article_url?: string, advisory_url?: string}>>({});
 
-  // Debounce 400ms
+  const API_BASE = "/api";
+
+  // Load references for all vulnerabilities
+  useEffect(() => {
+    const loadReferences = async () => {
+      const refMap: Record<string, {has_github: boolean, has_article: boolean, has_advisory: boolean, github_url?: string, article_url?: string, advisory_url?: string}> = {};
+      const cveIds = vulns.map(v => v.cveID);
+
+      for (const cveId of cveIds) {
+        try {
+          const res = await fetch(`${API_BASE}/vulnerabilities/${cveId}/references`);
+          const data = await res.json();
+          const refs = data.references || [];
+          const github = refs.find((r: any) => r.type === 'github');
+          const article = refs.find((r: any) => r.type === 'article');
+          const advisory = refs.find((r: any) => r.type === 'advisory');
+          refMap[cveId] = {
+            has_github: !!github,
+            has_article: !!article,
+            has_advisory: !!advisory,
+            github_url: github?.url,
+            article_url: article?.url,
+            advisory_url: advisory?.url,
+          };
+        } catch (err) {
+          refMap[cveId] = { has_github: false, has_article: false, has_advisory: false };
+        }
+      }
+      setReferences(refMap);
+    };
+
+    if (vulns.length > 0) loadReferences();
+  }, [vulns]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Filter
   const filtered = useMemo(() => {
     if (!debouncedQuery) return vulns;
     const q = debouncedQuery.toLowerCase();
@@ -87,7 +120,6 @@ const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string
 
   return (
     <div>
-      {/* Search Input */}
       <div className="mb-4 relative">
         <input
           type="text"
@@ -124,7 +156,6 @@ const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string
         )}
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead style={{ backgroundColor: "var(--bg-secondary)", borderBottomColor: "var(--border-color)" }} className="border-b">
@@ -156,7 +187,9 @@ const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string
             </tr>
           </thead>
           <tbody>
-            {filtered.map((v) => (
+            {filtered.map((v) => {
+              const refs = references[v.cveID] || { has_github: false, has_article: false, has_advisory: false };
+              return (
               <tr
                 key={v.cveID}
                 className="transition cursor-pointer"
@@ -204,7 +237,7 @@ const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string
                 >
                   {(v.epss_score || 0).toFixed(2)}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 flex gap-2 items-center">
                   <span
                     className="px-2 py-1 rounded text-white text-xs font-semibold"
                     style={{
@@ -213,9 +246,46 @@ const VulnTable: React.FC<{ vulns: Vulnerability[]; onSelectCve?: (cveId: string
                   >
                     {v.priority}
                   </span>
+                  {refs.has_github && refs.github_url && (
+                    <a
+                      href={refs.github_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2 py-1 rounded text-xs font-semibold inline-block transition hover:opacity-80"
+                      style={{ backgroundColor: "#1f2937", color: "#60a5fa", textDecoration: "none" }}
+                    >
+                      🔧 PoC
+                    </a>
+                  )}
+                  {refs.has_article && refs.article_url && (
+                    <a
+                      href={refs.article_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2 py-1 rounded text-xs font-semibold inline-block transition hover:opacity-80"
+                      style={{ backgroundColor: "#1f2937", color: "#34d399", textDecoration: "none" }}
+                    >
+                      📰 Article
+                    </a>
+                  )}
+                  {refs.has_advisory && refs.advisory_url && (
+                    <a
+                      href={refs.advisory_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2 py-1 rounded text-xs font-semibold inline-block transition hover:opacity-80"
+                      style={{ backgroundColor: "#1f2937", color: "#fbbf24", textDecoration: "none" }}
+                    >
+                      ⚠️ Advisory
+                    </a>
+                  )}
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && (
@@ -244,7 +314,6 @@ export const LightDashboard: React.FC = () => {
   const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
   const [selectedCveId, setSelectedCveId] = useState<string | null>(null);
 
-  // === Fetch on mount & page change ===
   useEffect(() => {
     if (page !== "overview") return;
 
@@ -260,195 +329,174 @@ export const LightDashboard: React.FC = () => {
 
   return (
     <div
-      className="flex h-screen"
+      className="flex flex-col h-screen"
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
-      {/* Sidebar */}
+      <Header
+        title={
+          page === "overview"
+            ? "Dashboard"
+            : page === "threats"
+              ? "X Threats"
+              : "Vulnerabilities"
+        }
+        subtitle={
+          page === "overview"
+            ? "Threat Intelligence Overview & Statistics"
+            : undefined
+        }
+      />
+
       <div
-        className="w-48 border-r p-4 flex flex-col transition-colors duration-200"
+        className="border-b px-6 py-3 flex gap-6 transition-colors duration-200"
         style={{
           backgroundColor: "var(--bg-secondary)",
-          borderRightColor: "var(--border-color)",
+          borderBottomColor: "var(--border-color)",
         }}
       >
-        <h1
-          className="text-xl font-bold mb-6"
-          style={{ color: "var(--text-primary)" }}
-        >
-          TI Dashboard
-        </h1>
-        <nav className="space-y-2 flex-1">
-          {[
-            { id: "overview", label: "Dashboard" },
-            { id: "threats", label: "X Threats" },
-            { id: "vulnerabilities", label: "Vulnerabilities" },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setPage(item.id as typeof page)}
-              className="w-full text-left px-4 py-2 rounded-lg transition"
-              style={{
-                backgroundColor:
-                  page === item.id ? "var(--input-focus)" : "transparent",
-                color:
-                  page === item.id ? "#fff" : "var(--text-secondary)",
-                fontWeight: page === item.id ? "600" : "400",
-                borderLeftWidth: page === item.id ? "4px" : "0",
-                borderLeftColor:
-                  page === item.id ? "var(--input-focus)" : "transparent",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                if (page !== item.id) {
-                  el.style.backgroundColor = "var(--bg-tertiary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                if (page !== item.id) {
-                  el.style.backgroundColor = "transparent";
-                }
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        {[
+          { id: "overview", label: "Dashboard" },
+          { id: "threats", label: "X Threats" },
+          { id: "vulnerabilities", label: "Vulnerabilities" },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setPage(item.id as typeof page)}
+            className="pb-3 transition font-medium"
+            style={{
+              color:
+                page === item.id
+                  ? "var(--text-primary)"
+                  : "var(--text-secondary)",
+              borderBottomWidth: page === item.id ? "2px" : "0",
+              borderBottomColor:
+                page === item.id ? "var(--input-focus)" : "transparent",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              if (page !== item.id) {
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "var(--text-primary)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (page !== item.id) {
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "var(--text-secondary)";
+              }
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      {/* Main Content */}
-      <div
-        className="flex-1 flex flex-col overflow-hidden transition-colors duration-200"
-        style={{ backgroundColor: "var(--bg-primary)" }}
-      >
-        {/* Global Header with Theme Toggle */}
-        <Header
-          title={
-            page === "overview"
-              ? "Dashboard"
-              : page === "threats"
-                ? "X Threats"
-                : "Vulnerabilities"
-          }
-          subtitle={
-            page === "overview"
-              ? "Threat Intelligence Overview & Statistics"
-              : undefined
-          }
-        />
+      <div className="flex-1 overflow-y-auto p-6">
+        {page === "detail" && selectedCveId && (
+          <VulnerabilityDetail
+            cveId={selectedCveId}
+            onBack={() => setPage("vulnerabilities")}
+          />
+        )}
+        {page === "threats" && <XThreatsPage />}
+        {page === "vulnerabilities" && (
+          <VulnerabilitiesPage
+            initialFilter={filterSeverity}
+            onSelectCve={(cveId) => {
+              setSelectedCveId(cveId);
+              setPage("detail");
+            }}
+          />
+        )}
 
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {page === "detail" && selectedCveId && (
-            <VulnerabilityDetail
-              cveId={selectedCveId}
-              onBack={() => setPage("vulnerabilities")}
-            />
-          )}
-          {page === "threats" && <XThreatsPage />}
-          {page === "vulnerabilities" && (
-            <VulnerabilitiesPage
-              initialFilter={filterSeverity}
-              onSelectCve={(cveId) => {
-                setSelectedCveId(cveId);
-                setPage("detail");
-              }}
-            />
-          )}
-
-          {page === "overview" && (
-            <>
-              {/* Stats Grid */}
-              {loading ? (
-                <div
-                  className="text-center py-8"
-                  style={{ color: "var(--text-tertiary)" }}
-                >
-                  Loading...
+        {page === "overview" && (
+          <>
+            {loading ? (
+              <div
+                className="text-center py-8"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                Loading...
+              </div>
+            ) : stats ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                  <MetricCard
+                    title="Total Vulnerabilities"
+                    value={stats.total}
+                    onClick={() => {
+                      setFilterSeverity(null);
+                      setPage("vulnerabilities");
+                    }}
+                  />
+                  <MetricCard
+                    title="Critical"
+                    value={stats.priority_counts.CRITICAL || 0}
+                    subtitle={`${(
+                      ((stats.priority_counts.CRITICAL || 0) / stats.total) *
+                      100
+                    ).toFixed(1)}%`}
+                    onClick={() => {
+                      setFilterSeverity("CRITICAL");
+                      setPage("vulnerabilities");
+                    }}
+                  />
+                  <MetricCard
+                    title="High"
+                    value={stats.priority_counts.HIGH || 0}
+                    onClick={() => {
+                      setFilterSeverity("HIGH");
+                      setPage("vulnerabilities");
+                    }}
+                  />
+                  <MetricCard
+                    title="Medium"
+                    value={stats.priority_counts.MEDIUM || 0}
+                    onClick={() => {
+                      setFilterSeverity("MEDIUM");
+                      setPage("vulnerabilities");
+                    }}
+                  />
                 </div>
-              ) : stats ? (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <MetricCard
-                      title="Total Vulnerabilities"
-                      value={stats.total}
-                      onClick={() => {
-                        setFilterSeverity(null);
-                        setPage("vulnerabilities");
-                      }}
-                    />
-                    <MetricCard
-                      title="Critical"
-                      value={stats.priority_counts.CRITICAL || 0}
-                      subtitle={`${(
-                        ((stats.priority_counts.CRITICAL || 0) / stats.total) *
-                        100
-                      ).toFixed(1)}%`}
-                      onClick={() => {
-                        setFilterSeverity("CRITICAL");
-                        setPage("vulnerabilities");
-                      }}
-                    />
-                    <MetricCard
-                      title="High"
-                      value={stats.priority_counts.HIGH || 0}
-                      onClick={() => {
-                        setFilterSeverity("HIGH");
-                        setPage("vulnerabilities");
-                      }}
-                    />
-                    <MetricCard
-                      title="Medium"
-                      value={stats.priority_counts.MEDIUM || 0}
-                      onClick={() => {
-                        setFilterSeverity("MEDIUM");
-                        setPage("vulnerabilities");
-                      }}
-                    />
-                  </div>
 
-                  {/* Bottom Section: Critical Vulns + Honeypot */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Critical Vulnerabilities (2/3 width) */}
-                    <div
-                      className="lg:col-span-2 rounded-lg border p-6"
-                      style={{
-                        backgroundColor: "var(--bg-secondary)",
-                        borderColor: "var(--border-color)",
-                      }}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div
+                    className="lg:col-span-2 rounded-lg border p-6"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      borderColor: "var(--border-color)",
+                    }}
+                  >
+                    <h3
+                      className="text-lg font-bold mb-4"
+                      style={{ color: "var(--text-primary)" }}
                     >
-                      <h3
-                        className="text-lg font-bold mb-4"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        Recent Critical Vulnerabilities
-                      </h3>
-                      <VulnTable
-                        vulns={criticalVulns}
-                        onSelectCve={(cveId) => {
-                          setSelectedCveId(cveId);
-                          setPage("detail");
-                        }}
-                      />
-                    </div>
-
-                    {/* Honeypot Panel (1/3 width) */}
-                    <div className="lg:col-span-1">
-                      <HoneypotPanel />
-                    </div>
+                      Recent Critical Vulnerabilities
+                    </h3>
+                    <VulnTable
+                      vulns={criticalVulns}
+                      onSelectCve={(cveId) => {
+                        setSelectedCveId(cveId);
+                        setPage("detail");
+                      }}
+                    />
                   </div>
-                </>
-              ) : (
-                <div
-                  className="text-center py-8"
-                  style={{ color: "var(--text-tertiary)" }}
-                >
-                  No data available
+
+                  <div className="lg:col-span-1">
+                    <HoneypotPanel />
+                  </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </>
+            ) : (
+              <div
+                className="text-center py-8"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                No data available
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
