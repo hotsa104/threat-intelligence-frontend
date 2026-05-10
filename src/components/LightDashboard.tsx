@@ -128,11 +128,12 @@ const VulnTable: React.FC<{
   >({});
 
   useEffect(() => {
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
     const loadReferences = async () => {
       const refMap: typeof references = {};
       for (const cveId of vulns.map((v) => v.cveID)) {
         try {
-          const res = await fetch(`/api/vulnerabilities/${cveId}/references`);
+          const res = await fetch(`${API_BASE}/vulnerabilities/${cveId}/references`);
           const data = await res.json();
           const refs = data.references || [];
           const github   = refs.find((r: any) => r.type === "github");
