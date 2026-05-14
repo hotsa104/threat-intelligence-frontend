@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { fetchVulnStats, fetchCriticalEnriched } from "../api";
-import type { Vulnerability } from "../api";
+import type { Vulnerability, VulnStats } from "../api";
 import { PRIORITY_COLORS } from "../theme";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -9,7 +9,8 @@ import { VulnerabilitiesPage } from "./VulnerabilitiesPage";
 import { VulnerabilityDetail } from "./VulnerabilityDetail";
 import { HoneypotPanel } from "./HoneypotPanel";
 import { PriorityChart } from "./PriorityChart";
-import { ThreatCategoriesChart } from "./ThreatCategoriesChart";
+import { CVETrendChart } from "./CVETrendChart";
+import { LoadingSpinner, ErrorBox } from "./LoadingSpinner";
 
 // === Reference icons ===
 const IconGithub = () => (
@@ -35,18 +36,46 @@ const IconAdvisory = () => (
 
 type Page = "overview" | "threats" | "vulnerabilities" | "detail";
 
+// === SyncBadge ===
+const SyncBadge: React.FC<{ lastSync?: { run_at?: string; status?: string } | null }> = ({ lastSync }) => {
+  if (!lastSync?.run_at) return null;
+  const dt = new Date(lastSync.run_at);
+  const now = new Date();
+  const diffMin = Math.floor((now.getTime() - dt.getTime()) / 60000);
+  const label =
+    diffMin < 1  ? "just now"
+    : diffMin < 60 ? `${diffMin}m ago`
+    : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago`
+    : `${Math.floor(diffMin / 1440)}d ago`;
+  const stale = diffMin > 360;
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        padding: "2px 8px",
+        borderRadius: 4,
+        fontFamily: "monospace",
+        color: stale ? "#f97316" : "#10b981",
+        background: stale ? "rgba(249,115,22,0.1)" : "rgba(16,185,129,0.1)",
+        border: `1px solid ${stale ? "rgba(249,115,22,0.25)" : "rgba(16,185,129,0.25)"}`,
+      }}
+    >
+      ● sync {label}
+    </span>
+  );
+};
+
 // === MetricCard ===
 const MetricCard: React.FC<{
   title: string;
   value: number | string;
   subtitle?: string;
   priority?: string;
+  color?: string;
   onClick?: () => void;
-}> = ({ title, value, subtitle, priority, onClick }) => {
-  const accentColor = priority ? PRIORITY_COLORS[priority] || "var(--accent-primary)" : "var(--accent-primary)";
-  const glowColor = priority
-    ? `${PRIORITY_COLORS[priority]}33`
-    : "var(--accent-glow)";
+}> = ({ title, value, subtitle, priority, color, onClick }) => {
+  const accentColor = color || (priority ? PRIORITY_COLORS[priority] || "var(--accent-primary)" : "var(--accent-primary)");
+  const glowColor = `${accentColor}22`;
 
   return (
     <div
@@ -57,7 +86,6 @@ const MetricCard: React.FC<{
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={(e) => e.key === "Enter" && onClick?.()}
     >
-      {/* Top accent line */}
       <div
         style={{
           position: "absolute",
@@ -70,7 +98,6 @@ const MetricCard: React.FC<{
           opacity: 0.7,
         }}
       />
-
       <div className="flex items-center gap-2 mb-3">
         <div
           style={{
@@ -82,24 +109,16 @@ const MetricCard: React.FC<{
             flexShrink: 0,
           }}
         />
-        <span
-          className="text-xs font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <span className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
           {title}
         </span>
       </div>
-
       <p
         className="num text-3xl font-bold mb-1"
-        style={{
-          color: "var(--text-primary)",
-          textShadow: `0 0 20px ${accentColor}40`,
-        }}
+        style={{ color: accentColor !== "var(--accent-primary)" ? accentColor : "var(--text-primary)", textShadow: `0 0 20px ${accentColor}40` }}
       >
         {value}
       </p>
-
       {subtitle && (
         <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
           {subtitle}
@@ -174,7 +193,6 @@ const VulnTable: React.FC<{
 
   return (
     <div>
-      {/* Search */}
       <div className="relative mb-4">
         <input
           type="text"
@@ -200,7 +218,6 @@ const VulnTable: React.FC<{
         )}
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -219,12 +236,16 @@ const VulnTable: React.FC<{
           <tbody>
             {filtered.map((v) => {
               const refs = references[v.cveID] || {};
+              const isRansomware = v.knownRansomwareCampaignUse === "Known";
               return (
                 <tr
                   key={v.cveID}
                   onClick={() => onSelectCve?.(v.cveID)}
                   className="cursor-pointer transition-colors"
-                  style={{ borderBottom: "1px solid var(--border-light)" }}
+                  style={{
+                    borderBottom: "1px solid var(--border-light)",
+                    borderLeft: isRansomware ? "2px solid #f97316" : "2px solid transparent",
+                  }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--bg-glass)";
                   }}
@@ -233,17 +254,24 @@ const VulnTable: React.FC<{
                   }}
                 >
                   <td className="px-4 py-3 font-mono text-xs">
-                    <a
-                      href={`https://nvd.nist.gov/vuln/detail/${v.cveID}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ color: "var(--accent-cyan)", textDecoration: "none" }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "none")}
-                    >
-                      {v.cveID}
-                    </a>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <a
+                        href={`https://nvd.nist.gov/vuln/detail/${v.cveID}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: "var(--accent-cyan)", textDecoration: "none" }}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline")}
+                        onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "none")}
+                      >
+                        {v.cveID}
+                      </a>
+                      {isRansomware && (
+                        <span style={{ fontSize: 9, color: "#f97316", fontWeight: 700, letterSpacing: "0.06em" }}>
+                          🔒 RANSOMWARE
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 max-w-xs" style={{ color: "var(--text-secondary)" }}>
                     <span className="line-clamp-2 text-xs">
@@ -319,52 +347,43 @@ const VulnTable: React.FC<{
 // === Main Dashboard ===
 export const LightDashboard: React.FC = () => {
   const [page, setPage] = useState<Page>("overview");
-  const [stats, setStats] = useState<{
-    total: number;
-    priority_counts: Record<string, number>;
-    threat_categories?: Record<string, number>;
-  } | null>(null);
+  const [stats, setStats] = useState<VulnStats | null>(null);
   const [criticalVulns, setCriticalVulns] = useState<Vulnerability[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
   const [selectedCveId, setSelectedCveId] = useState<string | null>(null);
-  const [threatKeyword, setThreatKeyword] = useState<string | null>(null);
 
-  // カテゴリ名 → X キーワードのマッピング
-  const CATEGORY_TO_KEYWORD: Record<string, string> = {
-    "Ransomware":    "ransomware",
-    "Malware":       "malware",
-    "Exploit":       "exploit",
-    "Phishing":      "phishing",
-    "Botnet / DDoS": "botnet",
-    "APT":           "apt",
-    "Vulnerability": "vulnerability",
-  };
-
-  useEffect(() => {
-    if (page !== "overview") return;
+  const loadData = () => {
     setLoading(true);
+    setError(null);
     Promise.all([fetchVulnStats(), fetchCriticalEnriched()])
       .then(([statsData, criticalData]) => {
         setStats(statsData);
         setCriticalVulns(criticalData.data);
       })
-      .catch(() => {
-        // バックエンド未起動時はモックデータで表示
+      .catch((err) => {
+        setError(err?.message || "Failed to load data. Using offline mode.");
         setStats({
           total: 1590,
           priority_counts: { CRITICAL: 557, HIGH: 315, MEDIUM: 240, LOW: 478 },
-          threat_categories: { ransomware: 0, exploit_ready: 715, critical_high: 872 },
+          ransomware_count: 42,
+          trend: [],
         });
         setCriticalVulns([
-          { cveID: "CVE-2024-21887", vulnerabilityName: "Ivanti Connect Secure Command Injection", shortDescription: "Command injection in Ivanti Connect Secure", epss_score: 0.97, priority: "CRITICAL" } as any,
-          { cveID: "CVE-2024-3400", vulnerabilityName: "PAN-OS GlobalProtect RCE", shortDescription: "Remote code execution in PAN-OS", epss_score: 0.95, priority: "CRITICAL" } as any,
-          { cveID: "CVE-2023-46805", vulnerabilityName: "Ivanti ICS Auth Bypass", shortDescription: "Authentication bypass in Ivanti ICS", epss_score: 0.92, priority: "CRITICAL" } as any,
-          { cveID: "CVE-2024-1709", vulnerabilityName: "ConnectWise ScreenConnect Auth Bypass", shortDescription: "Authentication bypass vulnerability", epss_score: 0.89, priority: "CRITICAL" } as any,
-          { cveID: "CVE-2024-20353", vulnerabilityName: "Cisco ASA DoS", shortDescription: "Denial of service in Cisco ASA", epss_score: 0.78, priority: "HIGH" } as any,
+          { cveID: "CVE-2024-21887", vulnerabilityName: "Ivanti Connect Secure Command Injection", shortDescription: "Command injection in Ivanti Connect Secure", epss_score: 0.97, priority: "CRITICAL", knownRansomwareCampaignUse: "Known" } as any,
+          { cveID: "CVE-2024-3400", vulnerabilityName: "PAN-OS GlobalProtect RCE", shortDescription: "Remote code execution in PAN-OS", epss_score: 0.95, priority: "CRITICAL", knownRansomwareCampaignUse: "Unknown" } as any,
+          { cveID: "CVE-2023-46805", vulnerabilityName: "Ivanti ICS Auth Bypass", shortDescription: "Authentication bypass in Ivanti ICS", epss_score: 0.92, priority: "CRITICAL", knownRansomwareCampaignUse: "Known" } as any,
+          { cveID: "CVE-2024-1709", vulnerabilityName: "ConnectWise ScreenConnect Auth Bypass", shortDescription: "Authentication bypass vulnerability", epss_score: 0.89, priority: "CRITICAL", knownRansomwareCampaignUse: "Unknown" } as any,
+          { cveID: "CVE-2024-20353", vulnerabilityName: "Cisco ASA DoS", shortDescription: "Denial of service in Cisco ASA", epss_score: 0.78, priority: "HIGH", knownRansomwareCampaignUse: "Unknown" } as any,
         ]);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (page !== "overview") return;
+    loadData();
   }, [page]);
 
   const pageTitle =
@@ -375,14 +394,13 @@ export const LightDashboard: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "var(--bg-primary)" }}>
-      {/* Sidebar */}
       <Sidebar page={page === "detail" ? "vulnerabilities" : page} setPage={setPage} />
 
-      {/* Main content */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header
           title={pageTitle}
           subtitle={page === "overview" ? "Threat Intelligence Overview" : undefined}
+          extra={page === "overview" ? <SyncBadge lastSync={stats?.last_sync} /> : undefined}
         />
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -395,8 +413,8 @@ export const LightDashboard: React.FC = () => {
 
           {page === "threats" && (
             <XThreatsPage
-              initialKeyword={threatKeyword}
-              onKeywordConsumed={() => setThreatKeyword(null)}
+              initialKeyword={null}
+              onKeywordConsumed={() => {}}
             />
           )}
 
@@ -413,15 +431,13 @@ export const LightDashboard: React.FC = () => {
           {page === "overview" && (
             <>
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>
-                    Loading...
-                  </div>
-                </div>
+                <LoadingSpinner message="Loading threat intelligence data..." />
               ) : stats ? (
                 <div className="space-y-6">
-                  {/* Metric cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {error && <ErrorBox error={error} onRetry={loadData} />}
+
+                  {/* Row 1: Metric cards (5 columns) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
                     <MetricCard
                       title="Total CVEs"
                       value={stats.total.toLocaleString()}
@@ -447,35 +463,40 @@ export const LightDashboard: React.FC = () => {
                       priority="MEDIUM"
                       onClick={() => { setFilterSeverity("MEDIUM"); setPage("vulnerabilities"); }}
                     />
+                    <MetricCard
+                      title="Ransomware CVEs"
+                      value={stats.ransomware_count ?? 0}
+                      color="#f97316"
+                      subtitle="CISA KEV: Known"
+                      onClick={() => { setFilterSeverity(null); setPage("vulnerabilities"); }}
+                    />
                   </div>
 
-                  {/* Charts row */}
+                  {/* Row 2: Charts */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     <div className="section-card">
-                      <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider"
+                      <h3 className="text-xs font-semibold mb-4 uppercase tracking-wider"
                         style={{ color: "var(--text-tertiary)" }}>
                         Priority Distribution
                       </h3>
                       <PriorityChart stats={stats} />
                     </div>
                     <div className="section-card">
-                      <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider"
+                      <h3 className="text-xs font-semibold mb-1 uppercase tracking-wider"
                         style={{ color: "var(--text-tertiary)" }}>
-                        Threat Categories
+                        CVE Trend
+                        <span style={{ marginLeft: 8, fontWeight: 400, textTransform: "none", letterSpacing: "normal", color: "var(--text-tertiary)", fontSize: 10 }}>
+                          — 過去30日
+                        </span>
                       </h3>
-                      <ThreatCategoriesChart
-                      onCategoryClick={(cat) => {
-                        const kw = CATEGORY_TO_KEYWORD[cat];
-                        if (kw) { setThreatKeyword(kw); setPage("threats"); }
-                      }}
-                    />
+                      <CVETrendChart trend={stats.trend ?? []} />
                     </div>
                   </div>
 
-                  {/* Table + Honeypot */}
+                  {/* Row 3: CVE table + Honeypot */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                     <div className="section-card lg:col-span-2">
-                      <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider"
+                      <h3 className="text-xs font-semibold mb-4 uppercase tracking-wider"
                         style={{ color: "var(--text-tertiary)" }}>
                         Recent Critical Vulnerabilities
                       </h3>
@@ -490,9 +511,12 @@ export const LightDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-64 text-sm"
-                  style={{ color: "var(--text-tertiary)" }}>
-                  No data available
+                <div className="space-y-4">
+                  {error && <ErrorBox error={error} onRetry={loadData} />}
+                  <div className="flex items-center justify-center h-64 text-sm"
+                    style={{ color: "var(--text-tertiary)" }}>
+                    No data available
+                  </div>
                 </div>
               )}
             </>

@@ -86,13 +86,17 @@ export interface VulnParams {
 export const fetchVulnerabilities = (params: VulnParams = {}) =>
   api.get<VulnerabilitiesResponse>("/vulnerabilities", { params });
 
+export interface VulnStats {
+  total: number;
+  priority_counts: Record<string, number>;
+  threat_categories?: Record<string, number>;
+  last_sync?: { run_at?: string; status?: string } | null;
+  trend?: { date: string; count: number }[];
+  ransomware_count?: number;
+}
+
 export const fetchVulnStats = () =>
-  api.get<{
-    total: number;
-    priority_counts: Record<string, number>;
-    threat_categories?: Record<string, number>;
-    last_sync?: string;
-  }>("/vulnerabilities/stats");
+  api.get<VulnStats>("/vulnerabilities/stats");
 
 export interface StatsSummary {
   kev_count: number;
@@ -119,10 +123,16 @@ export interface HoneypotPortEntry {
   count: number;
 }
 
+export interface HoneypotIpEntry {
+  ip: string;
+  count: number;
+}
+
 export interface HoneypotStats {
   available: boolean;
   total: number;
   top_ports: HoneypotPortEntry[];
+  top_src_ips?: HoneypotIpEntry[];
   message?: string;
 }
 

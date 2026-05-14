@@ -21,9 +21,10 @@ const IconMoon = () => (
   </svg>
 );
 
-export const Header: React.FC<{ title: string; subtitle?: string }> = ({
+export const Header: React.FC<{ title: string; subtitle?: string; extra?: React.ReactNode }> = ({
   title,
   subtitle,
+  extra,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -32,15 +33,18 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({
       className="flex items-center justify-between px-6 py-4 flex-shrink-0"
       style={{ borderBottom: "1px solid var(--border-color)" }}
     >
-      <div>
-        <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-          {title}
-        </h2>
-        {subtitle && (
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)" }}>
-            {subtitle}
-          </p>
-        )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {extra}
       </div>
 
       <button
